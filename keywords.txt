@@ -1,0 +1,45 @@
+#######################################
+# Syntax Coloring Map for ESP32S3_Touch_LCD_7_Board
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+ESP32S3_Touch_LCD_7_Board	KEYWORD1
+ThreadsafeWire	KEYWORD1
+Guard	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+lcdReset	KEYWORD2
+lcdBacklight	KEYWORD2
+touchReset	KEYWORD2
+exioWrite	KEYWORD2
+lock	KEYWORD2
+unlock	KEYWORD2
+beginTransmission	KEYWORD2
+endTransmission	KEYWORD2
+requestFrom	KEYWORD2
+write	KEYWORD2
+read	KEYWORD2
+readRegister	KEYWORD2
+writeRegister	KEYWORD2
+readByte	KEYWORD2
+writeByte	KEYWORD2
+raw	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+SDA_PIN	LITERAL1
+SCL_PIN	LITERAL1
+TOUCH_INT_PIN	LITERAL1
+CH422G_WR_SET	LITERAL1
+CH422G_WR_OC	LITERAL1
+CH422G_WR_IO	LITERAL1
+CH422G_RD_IO	LITERAL1
