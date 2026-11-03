@@ -1,12 +1,13 @@
 #######################################
-# Syntax Coloring Map for ESP32S3_Touch_LCD_7_Board
+# Syntax Coloring Map for ESP32S3_Touch_LCD_7_7B_Board
 #######################################
 
 #######################################
 # Datatypes (KEYWORD1)
 #######################################
 
-ESP32S3_Touch_LCD_7_Board	KEYWORD1
+ESP32S3_Touch_LCD_7_7B_Board	KEYWORD1
+Model	KEYWORD1
 ThreadsafeWire	KEYWORD1
 Guard	KEYWORD1
 
@@ -19,6 +20,23 @@ lcdReset	KEYWORD2
 lcdBacklight	KEYWORD2
 touchReset	KEYWORD2
 exioWrite	KEYWORD2
+exioRead	KEYWORD2
+exioReadAll	KEYWORD2
+exioPinMode	KEYWORD2
+lcdPower	KEYWORD2
+model	KEYWORD2
+modelName	KEYWORD2
+is7B	KEYWORD2
+panelWidth	KEYWORD2
+panelHeight	KEYWORD2
+hasBacklightPwm	KEYWORD2
+hasBatteryAdc	KEYWORD2
+setBacklightBrightness	KEYWORD2
+setBacklightPwmRaw	KEYWORD2
+selectCan	KEYWORD2
+sdChipSelect	KEYWORD2
+batteryRaw	KEYWORD2
+batteryVoltage	KEYWORD2
 lock	KEYWORD2
 unlock	KEYWORD2
 beginTransmission	KEYWORD2
@@ -39,7 +57,27 @@ raw	KEYWORD2
 SDA_PIN	LITERAL1
 SCL_PIN	LITERAL1
 TOUCH_INT_PIN	LITERAL1
-CH422G_WR_SET	LITERAL1
-CH422G_WR_OC	LITERAL1
-CH422G_WR_IO	LITERAL1
-CH422G_RD_IO	LITERAL1
+EXP_ADDR	LITERAL1
+
+#######################################
+# ThreadsafeWire v2 additions
+#######################################
+
+BackgroundGuard	KEYWORD1
+lockBackground	KEYWORD2
+unlockBackground	KEYWORD2
+acquired	KEYWORD2
+isWanted	KEYWORD2
+yieldToWaiters	KEYWORD2
+getBusStalls	KEYWORD2
+getBusHogs	KEYWORD2
+probe	KEYWORD2
+name	KEYWORD2
+ERR_BUS_STALLED	LITERAL1
+STALL_WARN_MS	LITERAL1
+STALL_GIVEUP_MS	LITERAL1
+HOG_WARN_MS	LITERAL1
+MODEL_UNKNOWN	LITERAL1
+MODEL_7	LITERAL1
+MODEL_7B	LITERAL1
+LCD7_7B_FORCE_MODEL	LITERAL1

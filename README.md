@@ -1,115 +1,145 @@
-# chipguy_ESP32-S3-Touch-LCD-7_board
+# chipguy_Waveshare-ESP32-S3-Touch-LCD-7-7B_board
 
-A small **board-support** library for the Waveshare **ESP32-S3-Touch-LCD-7**. It
-owns the two things on this board that every other driver needs to share: the
-**I²C bus** and the **CH422G I/O expander**.
+The **board** library for two 7-inch Waveshare touch screen boards: the
+**ESP32-S3-Touch-LCD-7** (800×480) and the **ESP32-S3-Touch-LCD-7B** (1024×600).
+It looks after the parts of the board that every other program needs to share,
+and it works out which of the two boards it is running on.
 
-You usually don't use this library directly. It is a **dependency** of
-**`chipguy_ESP32-S3-Touch-LCD-7_display`**, which drives the display and touch
-through it. Install it alongside that library and forget about it — unless you
-want to put your own I²C devices on the shared bus, or toggle one of the spare
-expander pins yourself.
+Most people never call it directly. The display library uses it for you. Install
+it, and come back here when you want the battery level, the screen brightness, or
+your own sensor on the I²C connector.
 
----
-
-## Why this library exists
-
-On the ESP32-S3-Touch-LCD-7, several control lines are **not** wired to ESP32
-GPIOs. They hang off an onboard **CH422G I²C expander**:
-
-| Line             | CH422G pin | Purpose                          |
-|------------------|------------|----------------------------------|
-| LCD reset        | EXIO3      | resets the ST7262 RGB panel      |
-| LCD backlight    | EXIO2      | backlight enable (on/off)        |
-| Touch reset      | EXIO1      | resets the GT911, latches 0x5D   |
-
-That expander, plus the GT911 touch controller and any other I²C peripherals,
-all share **one I²C bus** (`SDA = GPIO8`, `SCL = GPIO9`). Two problems follow,
-and this library solves both:
-
-1. **The bus must be shared safely.** It is wrapped in a mutex-protected
-   `ThreadsafeWire`, so multiple FreeRTOS tasks and drivers can use it at once
-   without corrupting each other's transactions.
-2. **The CH422G is not a normal register-mapped expander.** Instead of a register
-   index, it responds to a handful of fixed I²C "command" addresses, each a
-   single-byte write (`WR_SET` 0x24 to enable the IO0–7 outputs, `WR_IO` 0x38 to
-   drive them, …). This library hides that quirk behind named, device-specific
-   methods.
-
----
-
-## What it provides
-
-A single class, `ESP32S3_Touch_LCD_7_Board`:
-
-```cpp
-#include <ESP32S3_Touch_LCD_7_Board.h>
-
-ESP32S3_Touch_LCD_7_Board board;
-
-void setup() {
-    board.begin();              // bring up the I²C bus + put the CH422G in a known state
-}
-```
-
-- **`begin()`** — brings up the shared I²C bus and puts the CH422G in its known
-  power-on state (IO0–7 enabled as outputs; reset lines de-asserted; backlight
-  off so the display can draw a first frame before it is revealed). Idempotent:
-  the display and touch drivers both call it, only the first does the work.
-- **`Wire`** — the shared, mutex-protected I²C bus (a `ThreadsafeWire`). Use it
-  for your own I²C devices; hold a `ThreadsafeWire::Guard` across multi-step
-  (repeated-start) transactions.
-- **Device-specific control:**
-  - `lcdReset()` — pulse the panel reset (EXIO3) low→high.
-  - `lcdBacklight(bool on)` — switch the LCD backlight (EXIO2). On/off only;
-    this pin has no PWM.
-  - `touchReset()` — hold the GT911's INT (GPIO4) low while pulsing its reset
-    (EXIO1), which latches the controller at I²C address 0x5D, then release INT.
-- **`exioWrite(io, level)`** — escape hatch to toggle any CH422G output pin
-  (`io` is 0–7 = IO0–IO7). EXIO4 (SD_CS) and EXIO5 (USB_SEL) and the other
-  unused pins are yours to drive.
-
-### Using the shared bus for your own I²C devices
-
-```cpp
-ESP32S3_Touch_LCD_7_Board board;
-
-void setup() {
-    board.begin();
-
-    // Single-shot helpers (mutex-protected internally):
-    board.Wire.writeRegister(0x68, 0x6B, 0x00);     // e.g. wake an MPU-6050
-    uint8_t whoami;
-    board.Wire.readRegister(0x68, 0x75, whoami);
-
-    // Multi-step transaction? Hold the bus for the whole sequence:
-    {
-        ThreadsafeWire::Guard g(board.Wire);
-        board.Wire.beginTransmission(0x68);
-        board.Wire.write(0x3B);
-        board.Wire.endTransmission(false);          // repeated start
-        board.Wire.requestFrom((uint8_t)0x68, (size_t)6);
-        // ...read 6 bytes...
-    }
-}
-```
+| Library | What it does |
+| --- | --- |
+| [`chipguy_Waveshare-ESP32-S3-Touch-LCD-7-7B_display`](../chipguy_Waveshare-ESP32-S3-Touch-LCD-7-7B_display/README.md) | the screen, touch and LVGL — **start here** |
+| `chipguy_Waveshare-ESP32-S3-Touch-LCD-7-7B_board` (this one) | the shared I²C bus, the helper chip, which board it is, battery, brightness |
 
 ---
 
 ## Installation
 
-Download this library as a ZIP from GitHub (**Code ▸ Download ZIP**) and move the
-unzipped folder into your Arduino **libraries** directory
-(`~/Documents/Arduino/libraries/` on macOS/Linux,
-`Documents\Arduino\libraries\` on Windows), then restart the Arduino IDE.
-Install **`chipguy_ESP32-S3-Touch-LCD-7_display`** the same way — it depends on
-this library.
+Download this library from GitHub (**Code ▸ Download ZIP**), unzip it, and move the
+folder into your Arduino **libraries** folder (`Documents/Arduino/libraries`).
+Restart the Arduino IDE. It needs nothing else.
 
-This library is self-contained: its only dependency is the Arduino core's
-`Wire`.
+---
+
+## What it gives you
+
+```cpp
+#include <ESP32S3_Touch_LCD_7_7B_Board.h>
+
+ESP32S3_Touch_LCD_7_7B_Board board;   // the display examples already make this for you
+
+void setup() {
+    board.begin();
+    Serial0.println(board.modelName());   // "ESP32-S3-Touch-LCD-7" or "...-7B"
+}
+```
+
+Each board has a small **helper chip** (an "I/O expander") that switches things
+the ESP32 has no spare pins for: the screen's reset, the backlight, the
+memory-card slot's select line, and the touch chip's reset. The two boards use
+different helper chips, and `board.begin()` tells them apart by asking a
+question only one of them answers, before it changes anything. You reach all of
+it through `board`:
+
+| Call | What it does | -7 | -7B |
+| --- | --- | --- | --- |
+| `board.model()` / `board.modelName()` | which board this is | ✓ | ✓ |
+| `board.lcdBacklight(on)` | backlight fully on or off | ✓ | ✓ |
+| `board.setBacklightBrightness(percent)` | screen brightness, 0–100 | — | ✓ |
+| `board.batteryVoltage()` | the battery's voltage, in volts | — | ✓ |
+| `board.selectCan(true)` | use CAN instead of the second USB port | ✓ | ✓ |
+| `board.Wire` | the shared I²C bus — use it for your own sensors | ✓ | ✓ |
+
+On the -7, the calls it can't do return `false` (or "not a number" for the
+battery) and change nothing, so the same sketch runs on both.
+
+### The shared I²C bus
+
+The touch chip and the helper chip both live on the board's **I²C bus** (two wires
+that many small chips share). If your program also talks to it from more than one
+place at once, the messages could get mixed up. `board.Wire` prevents that: it
+works like Arduino's `Wire`, but only lets one conversation happen at a time. Use
+it instead of `Wire` for anything you plug into the I²C connector.
+
+```cpp
+if (board.Wire.probe(0x44)) {        // is a sensor at address 0x44?
+    board.Wire.writeRegister(0x44, 0x24, 0x00);
+}
+```
+
+Each single read or write is protected automatically. To make several in a row
+happen without anything in between, hold a `Guard`:
+
+```cpp
+{
+    ThreadsafeWire::Guard g(board.Wire);
+    uint8_t v;
+    board.Wire.readRegister(0x44, 0x10, v);
+    board.Wire.writeRegister(0x44, 0x10, v | 1);
+}
+```
+
+Some I²C addresses are taken. The touch chip is at **0x5D** on both boards. On
+the -7B the helper chip is at **0x24**. On the -7 it answers **0x20–0x27 and
+0x30–0x3F**, sixteen addresses at once, so a sensor of yours can't use any of
+those there. `begin()` looks at 0x38 to tell the boards apart.
+
+### Battery (-7B)
+
+The -7B has a socket for a single lithium battery, which charges when the USB-C
+port marked **UART** is plugged in. `board.batteryVoltage()` tells you its voltage.
+With no battery plugged in it still shows about 4.1–4.8 V, so a reading isn't proof
+that a battery is there. Nothing on the board can switch itself off; use a battery
+that has its own protection circuit. Details: [README-power.md](README-power.md).
+
+### What else is on the board
+
+- **RS-485 and CAN** connectors for industrial and vehicle networks.
+- **I²C**, **UART** and **GPIO** connectors for your own parts.
+- **Two USB-C ports:** upload through the one marked **UART**. On the -7B, set
+  the small **UART1/UART2** switch beside it to **UART1**.
+
+All of that is explained, for the -7B, in [README-board.md](README-board.md).
+
+### Memory card
+
+There's a microSD slot. The library doesn't include a card driver. It doesn't
+share anything with the screen. See [README-sdcard.md](README-sdcard.md).
+
+### The detail files cover the -7B
+
+The topic files below were written from the -7B's schematic. The -7's own
+schematic (V1.2) shows the same design for the screen, touch, I²C, the
+USB / CAN switch and the screen's power switch, and it has a battery charger
+too. Its versions of the power, connector and card-slot pages haven't been
+written yet.
+
+---
+
+## Where to go next
+
+- [README-board.md](README-board.md) — developers: the connectors, RS-485, CAN,
+  USB, buttons, and which pins are free (-7B).
+- [README-power.md](README-power.md) — developers: battery, charging, sleep, and what
+  can be switched off (-7B).
+- [README-sdcard.md](README-sdcard.md) — developers: the card slot's wiring and how
+  to mount it (-7B).
+- [README-limitations-errata.md](README-limitations-errata.md) — anyone choosing
+  a board: what it can't do, in one page.
+- [README-engineering.md](README-engineering.md) — engineers: the reasoning behind
+  the numbers, the helper chips' protocols, and how the boards are told apart.
+- [schematic-description.md](schematic-description.md) — engineers and LLMs without
+  the drawing: the -7B's schematic, part by part and net by net.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). `chipguy_ThreadsafeWire` is copied unchanged from
+the `chipguy_Board` library.
+
+This library replaces `chipguy_ESP32-S3-Touch-LCD-7_board` and
+`chipguy_Waveshare-ESP32-S3-Touch-LCD-7B_board`.
