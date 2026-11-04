@@ -4,8 +4,8 @@ What this board can't do, does wrong, or might be stressed by, read in a minute
 before you commit to it. Each item links to where the detail lives.
 
 Items 1–16 were written for the **-7B** (Waveshare schematic dated 2025-05-13, one
-unit tested 2026-10-26). They hold for the **-7** too (VER1.2 schematic, one unit
-tested 2026-11-03), except **5** (the -7 has no battery reading at all, item 18),
+unit tested 2026-10-26). They hold for the **-7** too (VER1.2 schematic; bench
+tests 2026-11-03 on a VER1.1 board), except **5** (the -7 has no battery reading at all, item 18),
 **10** (the -7 took 460800 baud) and **13** (the -7's R54 is a pull-down: no
 overvoltage). Items 17–23 are the -7's own.
 
@@ -133,9 +133,10 @@ overvoltage). Items 17–23 are the -7's own.
     part, is powered from 5 V on the -7, and its receiver output drives GPIO15
     directly (the 4.7 kΩ to 3.3 V is only a pull-up). In receive — which is
     whenever RS-485 isn't transmitting, including with nothing connected —
-    GPIO15 sits at 5 V, above the ESP32-S3's 3.3 V rating. **Measured** on one
-    VER1.2 board (2026-11-03): 5 V on U6 pin 8 (VCC) and pin 1 (RO), and 5 V at
-    the module's GPIO15.
+    GPIO15 sits at 5 V, above the ESP32-S3's 3.3 V rating. **Measured** on a
+    VER1.1 board (2026-11-03): 5 V on U6 pin 8 (VCC) and pin 1 (RO), and 5 V at
+    the module's GPIO15. The VER1.2 schematic draws the same circuit, so V1.2 is
+    expected to match (inferred; no V1.2 board measured).
     Software can't remove it, only move it: holding GPIO16 low disables the
     receiver and brings GPIO15 back to 3.3 V (measured). **`board.begin()` does
     that by default on the -7**; opening the RS-485 port lifts it, and

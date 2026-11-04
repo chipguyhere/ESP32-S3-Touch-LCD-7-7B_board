@@ -302,7 +302,7 @@ transitions is set by the bias and termination, not the driver (inferred). The
 U6 is on `5V`. The SP3485's recommended supply is 3.0–3.6 V (**TODO (datasheet)**:
 absolute maximum), and RO swings to its supply, so GPIO15 sees 5 V through nothing
 but the ESP32-S3's pad, with R74 pulling only toward 3.3 V. **Measured** (2026-11-03,
-one VER1.2 unit, bus idle and unconnected): 5 V on U6.8 and U6.1, and 5 V at the
+one VER1.1 unit — the schematic is V1.2 — bus idle and unconnected): 5 V on U6.8 and U6.1, and 5 V at the
 module's GPIO15. The ESP32-S3's pad clamp then carries whatever RO can source into `3V3`.
 
 The only software lever is RE#: it is tied to DE, so holding **GPIO16 low** turns

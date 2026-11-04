@@ -208,8 +208,9 @@ section references are to [schematic-description-7.md](schematic-description-7.m
 
 **What happens.** The -7 powers its RS-485 chip (an SP3485, which is meant for
 3.3 V) from 5 V. While the chip is listening, its output holds GPIO15 at **5 V**.
-Measured on a VER1.2 board, 2026-11-03: 5 V at the chip's output pin and at the
-ESP32 module's GPIO15. The chip listens whenever it isn't sending, so with RS-485
+Measured on a VER1.1 board, 2026-11-03: 5 V at the chip's output pin and at the
+ESP32 module's GPIO15. The VER1.2 schematic draws the same 5 V supply, so V1.2
+boards are expected to do the same (not yet measured). The chip listens whenever it isn't sending, so with RS-485
 in use GPIO15 is at 5 V almost all the time.
 
 **Why it matters.** The ESP32-S3's pins are rated for 3.3 V. At 5 V, current

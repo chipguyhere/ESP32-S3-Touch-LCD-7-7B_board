@@ -12,10 +12,19 @@ differs and points at the -7B file, section by section, where it doesn't.
 Designer** export (PDF Creator "Altium Designer", Producer "llPDFLib 3.x", CreationDate
 2025-11-06). Two pages: page 1 is the single sheet `ESP32-S3-Touch-LCD-7 V1.2.SchDoc`,
 page 2 the PCB silkscreen, which reads **"ESP32-S3-Touch-LCD-7 / 800×480 Pixels /
-VER1.2"**. No date or revision is printed in the title block. The silkscreen revision
-of the bench unit (MAC d8:3b:da:a5:e5:c4) has **not** been compared with VER1.2 —
-**TODO (bench)**. Older -7 revisions exist (the separate -7 library predating this one
-treated IO6 as free, which V1.2 does not), so a board without "VER1.2" may differ.
+VER1.2"**. No date or revision is printed in the title block.
+
+**The bench unit is a VER1.1** (its silkscreen, read 2026-11-03; MAC
+d8:3b:da:a5:e5:c4, serial port `wchusbserial59591146551` — the CH343's serial number,
+so the same board in every session). **Every (bench) entry in this file is that V1.1
+board measured against this V1.2 sheet.** No V1.1 schematic was available. Where a
+V1.1 measurement matches the V1.2 drawing, that block is taken to be the same in both
+revisions (inferred): the CH422G and its I²C addresses, the GT911, U9 on EXIO5 with
+HIGH = CAN, the SP3485 on 5 V with RO on GPIO15 and DI grounded (the GPIO16 behaviour
+matched S1's circuit exactly), the 0 Ω link at H2 on 3V3, and the J4/J5 jumpers.
+Anything else may differ on V1.1 — the separate, older -7 library treated IO6 as free,
+which V1.2 does not, so at least one earlier revision did differ. **TODO (bench):**
+test a VER1.2 board.
 
 **How it was read.** The **netlist was extracted from the PDF's metadata** — the
 Altium bookmark outline, dumped with `pypdf` — so connectivity is exact: 206
@@ -273,7 +282,7 @@ example should agree — **TODO (SDK)**: not checked.
 **U6 runs from `5V`.** The SP3485 is specified for a 3.3 V supply (**TODO
 (datasheet)**: its absolute maximum), and RO drives GPIO15 directly, with R74 only a
 pull-up, so in receive GPIO15 is driven to 5 V, above the ESP32-S3's 3.3 V I/O
-rating. (bench, 2026-11-03, one VER1.2 unit, bus terminals unconnected): **5 V on
+rating. (bench, 2026-11-03, the V1.1 unit, bus terminals unconnected): **5 V on
 U6.8 (VCC) and U6.1 (RO), and 5 V at the module's GPIO15.** RE# and DE are tied, so with GPIO16 low (S1
 off, RE# high) the receiver is disabled and RO goes high-impedance, releasing GPIO15
 to R74 — at the cost of the driver driving the bus low. (bench, 2026-11-03): with
@@ -354,7 +363,10 @@ There is no `RS485_VCC`, `GND1` or `VUART'` on the -7.
 
 ## 4. What the sheet does not say
 
-- **Whether the bench unit is VER1.2** — not checked. **TODO (bench).**
+- **VER1.1 vs VER1.2**: the bench unit is V1.1 and no V1.1 schematic is at hand, so
+  what changed between them is unknown beyond the blocks listed in the opening
+  paragraphs, which agree. **TODO (schematic):** a V1.1 sheet; **TODO (bench):** a
+  V1.2 board.
 - **R112's fitted option** (NC or 100 Ω): decides whether IO3 can reset the panel.
   **TODO (bench).**
 - **S1's part**, **F1/F2's rating** — not printed. **TODO (schematic).**
