@@ -140,7 +140,8 @@ overvoltage). Items 17–23 are the -7's own.
     receiver and brings GPIO15 back to 3.3 V (measured). **`board.begin()` does
     that by default on the -7**; opening the RS-485 port lifts it, and
     `setRs485Guard(false)` turns it off for a board on a live bus — see
-    [README-board.md](README-board.md#-7-gpio15-and-the-5-v-receiver-output). Don't wire anything else to
+    [README-board.md](README-board.md#-7-rs-485-puts-5-v-on-gpio15). **Using**
+    RS-485 on a -7 always exposes GPIO15; fix the hardware first (same section). Don't wire anything else to
     GPIO15, and treat long-term use of the -7's RS-485 port as at your own risk;
     the lasting fix is a hardware change (power U6 from 3.3 V, or add a series
     resistor into GPIO15).

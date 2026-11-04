@@ -24,7 +24,7 @@ by borrowing a pin from a function you don't use.
 | A button, LED, relay, 1-Wire, analog input | **GPIO6** on the **GPIO header** (J8) | nothing |
 | A second UART | the **UART2 header** (H3), SW1 set to UART2 | the USB-UART port stops working |
 | An SPI device | GPIO11/12/13 (card-slot lines) + GPIO6 as CS | shares the bus with the card |
-| RS-485 | the **RS-485 terminal** (J7) | GPIO15/16 |
+| RS-485 | the **RS-485 terminal** (J7) | GPIO15/16. **On the -7, using it puts 5 V on GPIO15** ([below](#-7-rs-485-puts-5-v-on-gpio15)) |
 | CAN | the **CAN terminal** (J6), `board.selectCan(true)` | the second USB-C port goes dead |
 
 ## Headers and terminals
@@ -93,6 +93,13 @@ There is no physical header for GPIO11–13; you'd solder to the 0 Ω links R98,
 and R101 next to the slot, or use a microSD breakout in the slot.
 
 ## RS-485
+
+> **On the -7, using this port puts 5 V on an ESP32 pin.** The -7 powers its
+> RS-485 chip from 5 V, and whenever the port is listening — which is nearly all
+> the time — the chip holds GPIO15 at 5 V. The ESP32-S3 is a 3.3 V part and
+> nothing on the board limits the current. Read
+> [-7: RS-485 puts 5 V on GPIO15](#-7-rs-485-puts-5-v-on-gpio15) before using
+> RS-485 on a -7. The -7B is fine: its chip runs at 3.3 V.
 
 An SP3485 transceiver on **TX = GPIO16, RX = GPIO15** (the schematic's net labels
 have these the other way round; the board was checked — see
@@ -190,30 +197,52 @@ section references are to [schematic-description-7.md](schematic-description-7.m
 | I²C header H1 | silkscreen **I2C VCC GND SDA SCL**; its own supply `I2C_VCC`, set by a 0 Ω resistor at position **H2** — fitted to **3V3** as shipped, with a 5V position — through a level shifter (§1.11) | works as a 3.3 V header as shipped. Don't move the resistor to 5V: as drawn, that may lift the board's 3.3 V I²C bus. **TODO (bench).** |
 | Expander addresses | the CH422G answers **0x20–0x27 and 0x30–0x3F** | rules out PCF8574, MCP23017, TCA9554 and similar parts on the -7 |
 | GPIO6 header J8 | silkscreen **Sensor AD: 3V3 GND AD** | same pin (GPIO6), different label |
-| RS-485 | SP3485 on **5 V**; TX on GPIO16 switches the driver through a transistor; RX on GPIO15 (§1.13) | same `Serial1.begin(..., RS485_RX_PIN, RS485_TX_PIN)`. **Hazard, measured:** GPIO15 sits at 5 V whenever the port is receiving — see [errata 21](README-limitations-errata.md) and below. Speed not tested. |
+| RS-485 | SP3485 on **5 V**; TX on GPIO16 switches the driver through a transistor; RX on GPIO15 (§1.13) | same `Serial1.begin(..., RS485_RX_PIN, RS485_TX_PIN)` — but **using it holds GPIO15 at 5 V** (measured); see below and [errata 21](README-limitations-errata.md). Speed not tested. |
 | Terminators | two removable jumpers, **J4** (RS-485) and **J5** (CAN), silkscreen **120R / NC** — the -7B has a mini DIP switch (SW2) instead | move the jumper to **120R** at the two ends of a bus |
 | J9 (5 V terminal) | not fitted | |
 | CAN | as -7B (bench, 2026-11-03: 500 kbit/s to a -7B, no lost frames) | |
 | Panel clock R27 | 100 Ω, no capacitor | nothing to do |
 | Backlight | on/off only; the dimming option's pad P1 is not on any pin (§1.8) | `setBacklight()` treats 1–100 as on |
 
-### -7: GPIO15 and the 5 V receiver output
+### -7: RS-485 puts 5 V on GPIO15
 
-The -7's RS-485 transceiver runs from 5 V, and while it is receiving — the normal
-idle state, even with nothing plugged in — its output holds GPIO15 at 5 V (measured,
-2026-11-03). Holding **GPIO16 low** switches the chip to transmit, which turns its
-receiver output off and lets GPIO15 fall back to 3.3 V (also measured).
+**What happens.** The -7 powers its RS-485 chip (an SP3485, which is meant for
+3.3 V) from 5 V. While the chip is listening, its output holds GPIO15 at **5 V**.
+Measured on a VER1.2 board, 2026-11-03: 5 V at the chip's output pin and at the
+ESP32 module's GPIO15. The chip listens whenever it isn't sending, so with RS-485
+in use GPIO15 is at 5 V almost all the time.
 
-**The library does this for you.** On a -7, `board.begin()` (and so
-`lv_setup.begin()`) holds GPIO16 low. You only need to know three things:
+**Why it matters.** The ESP32-S3's pins are rated for 3.3 V. At 5 V, current
+flows into the pin's internal protection diodes, and nothing on the board limits
+it. The board may well run for a long time like this — it did on the bench — but
+it is outside the chip's rating, and the kind of stress that shortens a part's
+life or damages the pin. No software setting changes this while RS-485 is in use.
 
-- **Using RS-485:** just open the port. `Serial1.begin(115200, SERIAL_8N1,
-  board.RS485_RX_PIN, board.RS485_TX_PIN)` takes GPIO16 over, and the port works
-  normally. GPIO15 is then at 5 V whenever the port is receiving; on this board
-  that can't be avoided while RS-485 is in use.
-- **The cost:** while the guard is on, the transceiver drives the RS-485 line —
+**If you need RS-485 on a -7,** fix it in hardware first. Two ways, neither yet
+tried on a board — **TODO (bench)**:
+
+- **Run the chip from 3.3 V** (the proper fix): lift pin 8 of the SP3485 off its
+  pad and wire it to a 3.3 V point. The chip is a 3.3 V part, and its output then
+  can't exceed 3.3 V. The bus side is unaffected: RS-485 lines tolerate more than
+  5 V on a 3.3 V chip.
+- **Limit the current:** put a resistor of about 4.7–10 kΩ between the chip's
+  pin 1 and GPIO15. GPIO15 still sees more than 3.3 V, but only a fraction of a
+  milliamp can flow. Fine at ordinary baud rates; at the highest speeds the
+  resistor slows the edges.
+
+Or use the -7B for RS-485 work.
+
+**If you don't use RS-485, the library protects the pin.** Holding **GPIO16 low**
+switches the chip from listening to sending, which turns its output off; GPIO15
+then sits at 3.3 V (measured). On a -7, `board.begin()` (and so `lv_setup.begin()`)
+does this for you. Things to know:
+
+- **Opening the port lifts the protection.** `Serial1.begin(115200, SERIAL_8N1,
+  board.RS485_RX_PIN, board.RS485_TX_PIN)` takes GPIO16 over, the chip goes back
+  to listening, and GPIO15 is at 5 V again — see above.
+- **The cost:** while the protection is on, the chip drives the RS-485 line —
   about 1 mA with nothing attached.
-- **On a live RS-485 network without opening the port,** the guard would hold
+- **On a live RS-485 network without opening the port,** the protection would hold
   the whole bus in one state. Turn it off before the board starts:
 
 ```cpp
@@ -221,6 +250,5 @@ board.setRs485Guard(false);   // before lv_setup.begin() / board.begin(), or any
 lv_setup.begin();
 ```
 
-or build with `-DLCD7_7B_RS485_GUARD=0`. On the -7B both are no-ops: its
-transceiver runs at 3.3 V. The permanent fix is a hardware change; see
-[README-engineering.md](README-engineering.md#rs-485-113).
+or build with `-DLCD7_7B_RS485_GUARD=0`. On the -7B both are no-ops. The reasoning
+is in [README-engineering.md](README-engineering.md#rs-485-113).

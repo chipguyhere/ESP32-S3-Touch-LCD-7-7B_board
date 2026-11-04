@@ -311,4 +311,4 @@ receiver tri-states RO, and R74 brings GPIO15 back to 3.3 V. The price is that t
 driver is then on and drives DI's 0 onto the bus: about 1 mA into the bias
 resistors with nothing attached (inferred), but a stuck state on a live network.
 (bench, 2026-11-03): GPIO15 3.3 V with GPIO16 low, 5 V released. Hardware fixes: lift U6.8 to `3V3`, or a series
-resistor (≈1–10 kΩ) between U6.1 and GPIO15.
+resistor (≈4.7–10 kΩ; untested) between U6.1 and GPIO15.
