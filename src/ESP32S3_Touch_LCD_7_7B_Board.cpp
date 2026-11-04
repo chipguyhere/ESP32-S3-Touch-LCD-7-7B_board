@@ -65,7 +65,20 @@ bool ESP32S3_Touch_LCD_7_7B_Board::begin() {
     if (!ok) return false;
 
     _begun = true;
+    setRs485Guard(_rs485GuardWanted);   // -7: keep 5 V off GPIO15 (errata 21)
     return true;
+}
+
+bool ESP32S3_Touch_LCD_7_7B_Board::setRs485Guard(bool on) {
+    _rs485GuardWanted = on;
+    if (_model != MODEL_7) return _rs485GuardOn = false;   // 7B, or not begun yet
+    if (on) {
+        pinMode(RS485_TX_PIN, OUTPUT);
+        digitalWrite(RS485_TX_PIN, LOW);
+    } else if (_rs485GuardOn) {
+        pinMode(RS485_TX_PIN, INPUT);   // back to the board's R78 pull-up
+    }
+    return _rs485GuardOn = on;
 }
 
 void ESP32S3_Touch_LCD_7_7B_Board::exioWrite(uint8_t io, bool level) {

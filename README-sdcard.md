@@ -1,14 +1,9 @@
-# microSD card slot — ESP32-S3-Touch-LCD-7B
-
-> **-7B only, for now.** This file was written from the ESP32-S3-Touch-LCD-7B's
-> schematic and bench tests. The ESP32-S3-Touch-LCD-7 (800×480, CH422G expander),
-> which this library also supports, has its own card-slot wiring; its version of this
-> file is **TODO (schematic)**. Don't assume a pin or part here applies to it.
+# microSD card slot — ESP32-S3-Touch-LCD-7 and -7B
 
 The chipguy libraries for this board don't implement a filesystem for the card
 slot. This file gives you what you need to bring up the driver of your choice.
 Pin and net references come from
-[schematic-description.md](schematic-description.md).
+[schematic-description-7B.md](schematic-description-7B.md).
 
 ## Interface and pinout
 
@@ -72,3 +67,11 @@ expander do not use them.
 
 GPIO11, 12 and 13 are not strapping pins, so the card may be present at reset.
 D3 is held high by its pull-up even before the expander is set up.
+
+## On the -7
+
+The same slot, the same wiring and the same pins (VER1.2 schematic,
+[schematic-description-7.md §1.12](schematic-description-7.md#112-tf--microsd-sd1)):
+SPI or 1-bit SD on GPIO11/12/13, CS on expander line EXIO4, no card detect, no 4-bit
+mode. The only difference is a 100 Ω series resistor between the CH422G and the CS
+line, which changes nothing for a sketch. Not yet bench-tested on a -7.

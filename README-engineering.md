@@ -1,12 +1,14 @@
 # Engineering notes — ESP32-S3-Touch-LCD-7 / -7B board
 
-> Sections other than [Telling the two boards apart](#telling-the-two-boards-apart)
-> are about the **-7B**; the -7's are **TODO (schematic)**.
+> The sections after [Telling the two boards apart](#telling-the-two-boards-apart)
+> are the **-7B**. The -7's differences are derived in [The -7's
+> circuits](#the--7s-circuits) at the end, from
+> [schematic-description-7.md](schematic-description-7.md).
 
 The reasoning behind the figures and verdicts in [README-power.md](README-power.md),
 [README-board.md](README-board.md) and [README-sdcard.md](README-sdcard.md). The
 complete reading of the schematic — every part, pin and net — lives in
-[schematic-description.md](schematic-description.md); this file keeps only the
+[schematic-description-7B.md](schematic-description-7B.md); this file keeps only the
 analysis and cites it by section (§). The display driver's internals are in the
 display library's
 [README-engineering.md](../chipguy_Waveshare-ESP32-S3-Touch-LCD-7-7B_display/README-engineering.md).
@@ -238,3 +240,75 @@ All four used card lines have 10 kΩ pull-ups (R88–R91), so SD mode's open-dra
 CMD phase needs no internal pulls. D3 sits on EXIO4 with R88 pulling it up, so the
 card stays in SD mode unless the expander drives D3 low. Waveshare's demo and our
 bench run both used SD_MMC 1-bit mode on GPIO12/11/13.
+
+## The -7's circuits
+
+From the VER1.2 netlist; section numbers are
+[schematic-description-7.md](schematic-description-7.md)'s.
+
+### Battery divider (§1.2)
+
+R18 200 kΩ / R19 100 kΩ, the same ÷3 as the -7B's 20 kΩ / 10 kΩ at a tenth of the
+load: VBAT / 300 kΩ ≈ 14 µA at 4.2 V. The tap goes only to TP1. Wired to GPIO6
+(ADC1_CH5), the source impedance is 200 k ∥ 100 k ≈ 67 kΩ — high for the ESP32's
+SAR ADC, whose sampling capacitor wants a low source or a settling capacitor; a
+100 nF from TP1 to GND would make single readings stable (inferred).
+
+### Backlight (§1.8)
+
+The same AP3032 boost with R25 = 1.8 Ω (R26 "1.6R/NC", taken as not fitted). At the
+≈0.2 V FB reference assumed above, that is ≈ 0.2 / 1.8 ≈ 110 mA full-scale against the
+-7B's ≈ 78 mA (inferred, unverified). The -7B's `EXIO_PWM` net is `BL_EN` here, and
+R52 is a single-valued 0 Ω: `BL_EN` (pad P1) and the EN line `BL_EN_1` are one node,
+driven by CH422G IO2 through R114 100 Ω. So an external PWM on P1 would contend
+with IO2's push-pull output through 100 Ω; dimming needs IO2 left high and a PWM
+source strong enough to override it, or R114 removed (inferred). The FB-injection
+parts (R49–R51, C34) are drawn as NC options.
+
+### Panel bias enable (§1.9)
+
+R54 10 kΩ is a pull-down on `EXIO6` (SHDN# of the AP3012), not the -7B's pull-up to
+5 V. That removes the -7B's question of 5 V on a 3.3 V expander pin, and makes the
+bias default off. `board.begin()` drives IO6 high on both boards.
+
+### I²C header level shifter (§1.11)
+
+M1 (NDC7002N, two N-FETs) sits between `CTP_SDA/SCL` (3.3 V, R109/R110 pull-ups) and
+the header's `D_SDA/D_SCL` (R108/R113 pull-ups to `I2C_VCC`). The symbol puts both
+gates on `I2C_VCC`, the sources on the header side and the drains on the board side.
+The classic BSS138 shifter is the other way round: gate on the *low* rail, source on
+the low side. H2 is a 0 Ω link, fitted to 3V3 as shipped (bench, 2026-11-03); on 3V3 the orientation doesn't matter. With H2 on 5V:
+
+- Gate 5 V, source (header) idle at 5 V: V_GS = 0, channel off.
+- The body diode runs source → drain, i.e. from the 5 V header line into the 3.3 V
+  bus, which R109/R110 can only hold down through 4.7 kΩ against it. The 3.3 V side
+  would idle near 5 V − V_F, held lower only by the ESP32's, GT911's and CH422G's
+  input clamps (inferred).
+
+If the symbol's pin roles are right, the 5V position is unsafe. If Altium's S and D
+are swapped relative to the package (the netlist can't tell), it is the textbook
+circuit. **TODO (bench):** measure GPIO8 idle with H2 on 5V and nothing on the
+header.
+
+### RS-485 (§1.13)
+
+DI is grounded; GPIO16 drives the NPN S1, whose collector holds DE/RE# with R76
+(4.7 kΩ to 3V3). TX idle high → S1 on → DE low: receiving, driver off, bus at "1"
+from R82 (A to 5V) / R73 (B to GND). TX low → S1 off → DE high → the driver drives
+DI = 0. Each 0 bit is driven, each 1 bit is released bus, so the edge rate of 0→1
+transitions is set by the bias and termination, not the driver (inferred). The
+-7B's circuit (U15 buffer, Q1, RC hold) is the same idea with DI on TX.
+
+U6 is on `5V`. The SP3485's recommended supply is 3.0–3.6 V (**TODO (datasheet)**:
+absolute maximum), and RO swings to its supply, so GPIO15 sees 5 V through nothing
+but the ESP32-S3's pad, with R74 pulling only toward 3.3 V. **Measured** (2026-11-03,
+one VER1.2 unit, bus idle and unconnected): 5 V on U6.8 and U6.1, and 5 V at the
+module's GPIO15. The ESP32-S3's pad clamp then carries whatever RO can source into `3V3`.
+
+The only software lever is RE#: it is tied to DE, so holding **GPIO16 low** turns
+S1 off, R76 lifts DE/RE# to 3.3 V (above the SP3485's V_IH even at 5 V supply), the
+receiver tri-states RO, and R74 brings GPIO15 back to 3.3 V. The price is that the
+driver is then on and drives DI's 0 onto the bus: about 1 mA into the bias
+resistors with nothing attached (inferred), but a stuck state on a live network.
+(bench, 2026-11-03): GPIO15 3.3 V with GPIO16 low, 5 V released. Hardware fixes: lift U6.8 to `3V3`, or a series
+resistor (≈1–10 kΩ) between U6.1 and GPIO15.

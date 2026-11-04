@@ -50,6 +50,13 @@
 // when chipguy_Board's copy changes; do not fork it.
 #include "chipguy_ThreadsafeWire.h"
 
+// -7 only: hold GPIO16 (RS-485 TX) low from begin() so the 5 V RS-485
+// transceiver stops driving GPIO15 to 5 V (see setRs485Guard).  Define as 0 to
+// make the guard off by default.
+#ifndef LCD7_7B_RS485_GUARD
+#define LCD7_7B_RS485_GUARD 1
+#endif
+
 
 class ESP32S3_Touch_LCD_7_7B_Board {
 public:
@@ -88,12 +95,13 @@ public:
     static constexpr uint8_t EXIO_SD_CS      = 4;   // microSD chip select, active low
     static constexpr uint8_t EXIO_USB_SEL    = 5;   // GPIO19/20 LOW = USB-C port, HIGH = CAN
     static constexpr uint8_t EXIO_LCD_VDD_EN = 6;   // panel bias supply enable, active high
-    // EXIO0 and EXIO7 are not connected (7B; TODO (schematic) on the -7).
+    // EXIO0 and EXIO7 are not connected on either board (the -7's CH422G
+    // also leaves OC0..OC3 unconnected).
 
-    // Real GPIOs that belong to board-level functions, from the 7B's
-    // schematic.  The -7 shares the module wiring and its CAN pins match
-    // (Waveshare's -7 CAN example); its RS485, SD and sensor-header pins are
-    // TODO (schematic).
+    // Real GPIOs that belong to board-level functions.  The same on both
+    // boards (the module's pins carry the same nets on both schematics; see
+    // schematic-description-7.md / -7B.md).  -7: its RS-485 transceiver runs
+    // from 5 V, and may drive RS485_RX_PIN (GPIO15) toward 5 V -- errata 21.
     static constexpr int TOUCH_INT_PIN = 4;     // GT911 INT; also selects its address at reset
     static constexpr int SD_MOSI_PIN   = 11;
     static constexpr int SD_SCK_PIN    = 12;
@@ -102,7 +110,7 @@ public:
     static constexpr int RS485_RX_PIN  = 15;    // sheet's net labels have these swapped)
     static constexpr int CAN_TX_PIN    = 20;    // only when selectCan(true)
     static constexpr int CAN_RX_PIN    = 19;
-    static constexpr int SENSOR_PIN    = 6;     // the 7B's 3-pin "GPIO" header
+    static constexpr int SENSOR_PIN    = 6;     // the 3-pin header ("GPIO" on the 7B, "Sensor AD" on the -7)
 
     ESP32S3_Touch_LCD_7_7B_Board();
 
@@ -163,6 +171,25 @@ public:
     // or for manual framing.  Active low.
     void sdChipSelect(bool selected);
 
+    // --- -7 RS-485 guard (errata 21) ---
+    // The -7's SP3485 runs from 5 V, and while it is receiving its RO output
+    // holds GPIO15 at 5 V -- above the ESP32-S3's rating (measured).  Holding
+    // GPIO16 (RS485_TX_PIN) low switches the transceiver to transmit, which
+    // tri-states RO and lets GPIO15 fall to 3.3 V (measured), at the cost of
+    // the driver actively driving the RS-485 line.
+    //
+    // On by default on the -7 (LCD7_7B_RS485_GUARD): begin() applies it.  A
+    // sketch that opens the port with Serial1.begin(..., RS485_RX_PIN,
+    // RS485_TX_PIN) takes GPIO16 over and so lifts the guard -- GPIO15 is then
+    // at 5 V whenever the port receives, which RS-485 use can't avoid on this
+    // board.  Call setRs485Guard(false) -- before lv_setup.begin() or
+    // board.begin(), or any time after -- to release GPIO16 instead, e.g. for a
+    // -7 wired to a live bus that it won't open the port on (the guard would
+    // hold that bus in one state).  No-op on the 7B, whose transceiver runs at
+    // 3.3 V.  Returns whether the guard is now holding GPIO16 low.
+    bool setRs485Guard(bool on);
+    bool rs485Guard() const { return _rs485GuardOn; }
+
     // --- Battery (7B) ---
     // The raw expander ADC reading (10-bit range, 3.3 V reference) of VBAT
     // through a 20k/10k divider.  0 on the -7: it has a charger (U4) but its
@@ -189,4 +216,6 @@ private:
     uint8_t _outShadow;    // shadow of the output latches
     uint8_t _modeShadow;   // 7B: shadow of the mode register
     bool _begun;
+    bool _rs485GuardWanted = LCD7_7B_RS485_GUARD;
+    bool _rs485GuardOn = false;
 };

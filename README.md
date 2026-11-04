@@ -109,30 +109,34 @@ All of that is explained, for the -7B, in [README-board.md](README-board.md).
 There's a microSD slot. The library doesn't include a card driver. It doesn't
 share anything with the screen. See [README-sdcard.md](README-sdcard.md).
 
-### The detail files cover the -7B
+### Two boards, one set of files
 
-The topic files below were written from the -7B's schematic. The -7's own
-schematic (V1.2) shows the same design for the screen, touch, I²C, the
-USB / CAN switch and the screen's power switch, and it has a battery charger
-too. Its versions of the power, connector and card-slot pages haven't been
-written yet.
+The two boards are one design with a few parts changed. Each topic file below
+describes the -7B and ends with a section on what differs on the -7.
+
+> **-7 owners:** the RS-485 chip puts 5 V on one of the ESP32's pins (GPIO15),
+> which it isn't built for — measured on a real board. The library switches it
+> off at `board.begin()` unless your sketch uses RS-485. Don't wire anything else
+> to GPIO15, and don't move the I²C header's supply resistor (H2) from 3V3 to 5V. See
+> [errata 21 and 22](README-limitations-errata.md).
 
 ---
 
 ## Where to go next
 
 - [README-board.md](README-board.md) — developers: the connectors, RS-485, CAN,
-  USB, buttons, and which pins are free (-7B).
+  USB, buttons, and which pins are free (both boards).
 - [README-power.md](README-power.md) — developers: battery, charging, sleep, and what
-  can be switched off (-7B).
+  can be switched off (both boards).
 - [README-sdcard.md](README-sdcard.md) — developers: the card slot's wiring and how
-  to mount it (-7B).
+  to mount it (both boards).
 - [README-limitations-errata.md](README-limitations-errata.md) — anyone choosing
   a board: what it can't do, in one page.
 - [README-engineering.md](README-engineering.md) — engineers: the reasoning behind
   the numbers, the helper chips' protocols, and how the boards are told apart.
-- [schematic-description.md](schematic-description.md) — engineers and LLMs without
-  the drawing: the -7B's schematic, part by part and net by net.
+- [schematic-description-7.md](schematic-description-7.md) and
+  [schematic-description-7B.md](schematic-description-7B.md) — engineers and LLMs
+  without the drawing: each board's schematic, part by part and net by net.
 
 ---
 

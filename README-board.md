@@ -1,15 +1,15 @@
-# What's on the board — ESP32-S3-Touch-LCD-7B
-
-> **-7B only, for now.** This file was written from the ESP32-S3-Touch-LCD-7B's
-> schematic and bench tests. The ESP32-S3-Touch-LCD-7 (800×480, CH422G expander),
-> which this library also supports, has its own connectors and pin use; its version of this
-> file is **TODO (schematic)**. Don't assume a pin or part here applies to it.
+# What's on the board — ESP32-S3-Touch-LCD-7 and -7B
 
 Everything on the board that isn't the screen, the power path or the card slot:
 the RS-485 and CAN ports, the headers, the buttons, the two USB-C ports, and which
 pins are free for your own hardware. Power is in [README-power.md](README-power.md),
 the card slot in [README-sdcard.md](README-sdcard.md). Pin and part references point
-into [schematic-description.md](schematic-description.md).
+into [schematic-description-7B.md](schematic-description-7B.md).
+
+The two boards are one design. Everything below is the -7B, and it holds for the -7
+too except where [On the -7](#on-the--7) says otherwise: the I²C header, RS-485, the
+termination jumpers, J9 and a few addresses. The -7's parts are in
+[schematic-description-7.md](schematic-description-7.md).
 
 ## The short version: one free GPIO
 
@@ -53,7 +53,7 @@ if (board.Wire.probe(0x44)) {          // e.g. an SHT3x
 ```
 
 Addresses already taken: **0x24** (the I/O expander) and **0x5D** (the GT911 touch
-chip). Libraries that insist on a `TwoWire&` can be given `board.Wire.raw()`, but
+chip). On the -7 the expander takes **0x20–0x27 and 0x30–0x3F** instead of 0x24. Libraries that insist on a `TwoWire&` can be given `board.Wire.raw()`, but
 then they bypass the lock — only do that if nothing else touches the bus from
 another task. See [README.md](README.md) for the `ThreadsafeWire` details.
 
@@ -179,3 +179,48 @@ GPIO15/16 (RS-485), GPIO19/20 (USB or CAN), GPIO43/44 (USB-UART).
 
 Strapping pins: GPIO0 (BOOT, pulled up), GPIO3 (floating), GPIO45 and GPIO46
 (pulled down). All four are panel lines; the display driver owns them after boot.
+
+## On the -7
+
+The ESP32-S3-Touch-LCD-7 (VER1.2 schematic) differs from the -7B here. Part and
+section references are to [schematic-description-7.md](schematic-description-7.md).
+
+| What | -7 | Why it matters |
+| --- | --- | --- |
+| I²C header H1 | silkscreen **I2C VCC GND SDA SCL**; its own supply `I2C_VCC`, set by a 0 Ω resistor at position **H2** — fitted to **3V3** as shipped, with a 5V position — through a level shifter (§1.11) | works as a 3.3 V header as shipped. Don't move the resistor to 5V: as drawn, that may lift the board's 3.3 V I²C bus. **TODO (bench).** |
+| Expander addresses | the CH422G answers **0x20–0x27 and 0x30–0x3F** | rules out PCF8574, MCP23017, TCA9554 and similar parts on the -7 |
+| GPIO6 header J8 | silkscreen **Sensor AD: 3V3 GND AD** | same pin (GPIO6), different label |
+| RS-485 | SP3485 on **5 V**; TX on GPIO16 switches the driver through a transistor; RX on GPIO15 (§1.13) | same `Serial1.begin(..., RS485_RX_PIN, RS485_TX_PIN)`. **Hazard, measured:** GPIO15 sits at 5 V whenever the port is receiving — see [errata 21](README-limitations-errata.md) and below. Speed not tested. |
+| Terminators | two removable jumpers, **J4** (RS-485) and **J5** (CAN), silkscreen **120R / NC** — the -7B has a mini DIP switch (SW2) instead | move the jumper to **120R** at the two ends of a bus |
+| J9 (5 V terminal) | not fitted | |
+| CAN | as -7B (bench, 2026-11-03: 500 kbit/s to a -7B, no lost frames) | |
+| Panel clock R27 | 100 Ω, no capacitor | nothing to do |
+| Backlight | on/off only; the dimming option's pad P1 is not on any pin (§1.8) | `setBacklight()` treats 1–100 as on |
+
+### -7: GPIO15 and the 5 V receiver output
+
+The -7's RS-485 transceiver runs from 5 V, and while it is receiving — the normal
+idle state, even with nothing plugged in — its output holds GPIO15 at 5 V (measured,
+2026-11-03). Holding **GPIO16 low** switches the chip to transmit, which turns its
+receiver output off and lets GPIO15 fall back to 3.3 V (also measured).
+
+**The library does this for you.** On a -7, `board.begin()` (and so
+`lv_setup.begin()`) holds GPIO16 low. You only need to know three things:
+
+- **Using RS-485:** just open the port. `Serial1.begin(115200, SERIAL_8N1,
+  board.RS485_RX_PIN, board.RS485_TX_PIN)` takes GPIO16 over, and the port works
+  normally. GPIO15 is then at 5 V whenever the port is receiving; on this board
+  that can't be avoided while RS-485 is in use.
+- **The cost:** while the guard is on, the transceiver drives the RS-485 line —
+  about 1 mA with nothing attached.
+- **On a live RS-485 network without opening the port,** the guard would hold
+  the whole bus in one state. Turn it off before the board starts:
+
+```cpp
+board.setRs485Guard(false);   // before lv_setup.begin() / board.begin(), or any time after
+lv_setup.begin();
+```
+
+or build with `-DLCD7_7B_RS485_GUARD=0`. On the -7B both are no-ops: its
+transceiver runs at 3.3 V. The permanent fix is a hardware change; see
+[README-engineering.md](README-engineering.md#rs-485-113).

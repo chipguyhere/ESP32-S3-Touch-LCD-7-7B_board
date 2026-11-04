@@ -1,14 +1,14 @@
-# Power — ESP32-S3-Touch-LCD-7B
-
-> **-7B only, for now.** This file was written from the ESP32-S3-Touch-LCD-7B's
-> schematic and bench tests. The ESP32-S3-Touch-LCD-7 (800×480, CH422G expander),
-> which this library also supports, has its own power path; its version of this
-> file is **TODO (schematic)**. Don't assume a pin or part here applies to it.
+# Power — ESP32-S3-Touch-LCD-7 and -7B
 
 How the board is powered, what the battery reading means, and what can and can't
 turn things off. Part references point into
-[schematic-description.md](schematic-description.md); the reasoning behind the
+[schematic-description-7B.md](schematic-description-7B.md); the reasoning behind the
 inferred figures is in [README-engineering.md](README-engineering.md#power).
+
+The answers below are for the -7B. The -7 has the same charger, regulator, USB
+ports and lack of a power switch; where it differs — no battery reading, no
+dimming, no J9, the panel bias's default — see [On the -7](#on-the--7) at the end,
+and [schematic-description-7.md](schematic-description-7.md) for its parts.
 
 ## Power characteristics at a glance
 
@@ -180,3 +180,18 @@ want the cell cycled, remove it.
   with the backlight and panel bias off below it.
 - The library does nothing automatically. It reads the voltage and switches the
   rails; the policy is yours.
+
+## On the -7
+
+From the VER1.2 schematic ([schematic-description-7.md](schematic-description-7.md));
+nothing here has been measured.
+
+| Question | -7 answer |
+| --- | --- |
+| Power sources | the same two USB-C ports and battery connector J3, with the same roles; **no J9** 5 V terminal |
+| Charger | the same CS8501, 580 mA, LEDs CHARGE / DONE |
+| **Can we read the battery level?** | **No.** A 200 kΩ / 100 kΩ divider exists, but it goes only to test pad TP1, and the CH422G expander has no ADC. `board.batteryVoltage()` returns NAN and `batteryRaw()` 0. A sketch that needs the level must wire TP1 to a spare ADC pin (GPIO6, ADC1_CH5, on J8), reading VBAT ÷ 3. **TODO (bench).** |
+| Backlight | **on/off only** (EXIO2). No dimming input reaches a pin: `setBacklightBrightness()` returns false. |
+| Panel bias (EXIO6) | **off at power-up** (pull-down), on once `board.begin()` runs — the opposite default to the -7B, which matters only before `begin()` |
+| Always drawing | the battery divider, about **14 µA** (the -7B's draws ~140 µA); the POWER LED; the CH422G |
+| Power consumption | **TODO (bench)**, as on the -7B |

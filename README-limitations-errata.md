@@ -3,10 +3,11 @@
 What this board can't do, does wrong, or might be stressed by, read in a minute
 before you commit to it. Each item links to where the detail lives.
 
-Items 1–16 are the **-7B**: Waveshare schematic dated 2025-05-13, one unit
-tested 2026-10-26. Items 17–20 are the **-7** and the library's support for
-both boards; the -7 has not had the -7B's schematic review, so its list is
-short because it is unexamined, not because it is clean.
+Items 1–16 were written for the **-7B** (Waveshare schematic dated 2025-05-13, one
+unit tested 2026-10-26). They hold for the **-7** too (VER1.2 schematic, one unit
+tested 2026-11-03), except **5** (the -7 has no battery reading at all, item 18),
+**10** (the -7 took 460800 baud) and **13** (the -7's R54 is a pull-down: no
+overvoltage). Items 17–23 are the -7's own.
 
 1. **Only one free GPIO.** The 1024×600 panel takes 21 pins, and every other GPIO
    goes to touch, I²C, the card slot, RS-485, UART or USB/CAN. GPIO6 on the 3-pin
@@ -74,13 +75,13 @@ short because it is unexamined, not because it is clean.
     chip (likely a CH32V003, inferred) runs at 3.3 V. If that pin isn't 5 V-tolerant,
     up to about 0.17 mA flows into its clamp diode. It works on the tested unit;
     nothing can be done about it in software.
-    → [schematic-description.md §1.6](schematic-description.md#16-io-expander-u10)
+    → [schematic-description-7B.md §1.6](schematic-description-7B.md#16-io-expander-u10)
 
 14. **The USB-UART chip is half-powered when its port is unplugged.** **TODO
     (datasheet / bench):** the CH343's I/O supply comes from the board's 3.3 V while
     its main supply comes from the UART port. What it does to UART0's lines when
     unpowered is unknown; Serial0 output on battery or the USB port is untested.
-    → [schematic-description.md §4](schematic-description.md#4-what-the-sheet-does-not-say)
+    → [schematic-description-7B.md §4](schematic-description-7B.md#4-what-the-sheet-does-not-say)
 
 15. **PSRAM is one shared bus, and the display needs it continuously.** With
     Arduino on core 0, a sketch that moves a lot of data through PSRAM (scrolling
@@ -110,17 +111,15 @@ short because it is unexamined, not because it is clean.
 18. **-7: the backlight is on or off, and there is no battery reading.** Its
     CH422G expander has no PWM and no ADC. `setBacklight()` treats any level
     above 0 as full on; `setBacklightBrightness()` and `batteryVoltage()` return
-    `false` / NAN. The V1.2 schematic has a charger (U4) on VBAT, so a battery
-    charges; the sketch just can't see its voltage.
-    → [README.md](README.md#what-it-gives-you)
+    `false` / NAN. The battery still charges, and a ÷3 divider sits on test pad
+    TP1; wiring TP1 to GPIO6 would give a sketch the voltage.
+    → [README-power.md](README-power.md#on-the--7)
 
-19. **-7: the RS-485 and card-slot pins are not confirmed.** The library uses
-    the -7B's numbers. The USB / CAN switch (U9 on EXIO5, LOW = USB) and the
-    panel supply (EXIO6) match the -7B in the V1.2 schematic; RS-485 and the
-    card slot are **TODO (schematic)**. The old -7 library left EXIO5 HIGH,
-    which selected CAN and disconnected the native USB port; this one leaves it
-    on USB.
-    → [README-engineering.md](README-engineering.md#telling-the-two-boards-apart)
+19. **-7: the expander's panel-reset resistor may not be fitted.** R112, between
+    the CH422G and the panel's RESET line, is drawn as "NC/100R". If it is NC,
+    `lcdReset()` does nothing and the panel resets only at power-up through its
+    pull-up. Nothing visible depends on it so far. **TODO (bench).**
+    → [schematic-description-7.md §1.6](schematic-description-7.md#16-io-expander-u10)
 
 20. **-7: the CH422G takes sixteen I²C addresses.** It answers every address
     in 0x20–0x27 and 0x30–0x3F (bench, 2026-11-03), not just its four command
@@ -129,3 +128,36 @@ short because it is unexamined, not because it is clean.
     answers only 0x24. `begin()` tells the boards apart by 0x38, so a part at
     0x38 on a -7B would make it misidentify the board.
     → [README-engineering.md](README-engineering.md#telling-the-two-boards-apart)
+
+21. **-7: the RS-485 transceiver puts 5 V on GPIO15.** The SP3485, a 3.3 V
+    part, is powered from 5 V on the -7, and its receiver output drives GPIO15
+    directly (the 4.7 kΩ to 3.3 V is only a pull-up). In receive — which is
+    whenever RS-485 isn't transmitting, including with nothing connected —
+    GPIO15 sits at 5 V, above the ESP32-S3's 3.3 V rating. **Measured** on one
+    VER1.2 board (2026-11-03): 5 V on U6 pin 8 (VCC) and pin 1 (RO), and 5 V at
+    the module's GPIO15.
+    Software can't remove it, only move it: holding GPIO16 low disables the
+    receiver and brings GPIO15 back to 3.3 V (measured). **`board.begin()` does
+    that by default on the -7**; opening the RS-485 port lifts it, and
+    `setRs485Guard(false)` turns it off for a board on a live bus — see
+    [README-board.md](README-board.md#-7-gpio15-and-the-5-v-receiver-output). Don't wire anything else to
+    GPIO15, and treat long-term use of the -7's RS-485 port as at your own risk;
+    the lasting fix is a hardware change (power U6 from 3.3 V, or add a series
+    resistor into GPIO15).
+    → [schematic-description-7.md §1.13](schematic-description-7.md#113-rs-485)
+
+22. **-7: the I²C header's 5 V option may lift the board's I²C bus.** A 0 Ω
+    resistor at position H2 powers the header from 3.3 V (as shipped) or, moved,
+    5 V, through a two-MOSFET level shifter. Only a board that has been reworked
+    to 5 V is affected. As drawn, with H2 on 5 V the shifter's body diodes point from the
+    5 V side into the 3.3 V bus shared by the ESP32, the expander and touch.
+    Inferred from the symbol's pin roles; **TODO (bench):** measure GPIO8/9 idle
+    with H2 on 5 V. Leave the resistor on 3V3 until then.
+    → [schematic-description-7.md §1.11](schematic-description-7.md#111-the-ic-bus)
+
+23. **-7: the panel bias is off until the expander is set up.** Its enable has a
+    pull-down (the -7B's has a pull-up), so the panel's high-voltage rails stay
+    off from power-up until `board.begin()` drives EXIO6 high. Harmless with this
+    library, which always does; a sketch that skips `board.begin()` gets no
+    picture.
+    → [schematic-description-7.md §1.9](schematic-description-7.md#19-panel-bias-panel_voltage)
